@@ -1,5 +1,6 @@
+import React, { useCallback } from 'react';
+import { useLocalStorageState } from 'react-storage-hooks';
 import Keycloak from 'keycloak-js';
-import React from 'react';
 
 import { KeycloakProvider } from '../lib';
 
@@ -7,40 +8,30 @@ import { AppRouter } from './routes';
 
 const keycloak = new Keycloak();
 
-class PersistedApp extends React.PureComponent {
-  constructor(props) {
-    super(props);
+const PersistedApp = () => {
+    const [, setTokens] = useLocalStorageState('kcTokens');
 
-    this.tokens = JSON.parse(localStorage.getItem('kcTokens') || '{}');
-  }
+    const onKeycloakTokens = useCallback(tokens => {
+      console.log(new Date().toLocaleString(), 'onKeycloakTokens', { tokens });
+      setTokens(tokens);
+    }, [setTokens]);
+    
+    const onKeycloakEvent = useCallback((event, error) => {
+      console.log(new Date().toLocaleString(), 'onKeycloakEvent', event, error);
+      if (event === 'onAuthLogout') {
+        setTokens({});
+      }
+    }, [setTokens]);
 
-  onKeycloakEvent = (event, error) => {
-    console.log('onKeycloakEvent', event, error);
-    if (event === 'onAuthLogout') {
-      localStorage.removeItem('kcTokens');
-    }
-  }
-
-  onKeycloakTokens = tokens => {
-    console.log({ tokens });
-    localStorage.setItem('kcTokens', JSON.stringify(tokens));
-  }
-
-  render() {
     return (
       <KeycloakProvider
         keycloak={keycloak}
-        initConfig={{
-          onLoad: 'check-sso',
-          ...this.tokens,
-        }}
-        onEvent={this.onKeycloakEvent}
-        onTokens={this.onKeycloakTokens}
+        onEvent={onKeycloakEvent}
+        onTokens={onKeycloakTokens}
       >
         <AppRouter />
       </KeycloakProvider>
     );
-  }
-}
+  };
 
-export default PersistedApp;
+export default React.memo(PersistedApp);
